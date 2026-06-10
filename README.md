@@ -41,8 +41,7 @@ Edit [appsettings.json](appsettings.json) and set your Azure DevOps organization
 ```json
 {
   "AzureDevOps": {
-    "Organization": "your-organization",
-    "Project": "Demos"
+    "Organization": "your-organization"
   },
   "Output": {
     "FilePath": "ado-users-export.csv"
@@ -51,7 +50,6 @@ Edit [appsettings.json](appsettings.json) and set your Azure DevOps organization
 ```
 
 - `Organization` — the name of your Azure DevOps organization (the part in `https://dev.azure.com/<organization>`).
-- `Project` — included for context; the export operates at the organization level.
 - `Output:FilePath` — the path of the CSV file to write. Relative paths are resolved against the working directory.
 
 ### 3. Provide your Personal Access Token
@@ -111,7 +109,7 @@ Export complete. Wrote 137 users to 'ado-users-export.csv'.
 ```
 ADOUserExporter/
 ├── Program.cs                  # Entry point: orchestrates the export and writes the CSV
-├── appsettings.json            # Organization, project, and output configuration
+├── appsettings.json            # Organization, and output configuration
 ├── Configuration/
 │   └── AppSettings.cs          # Strongly-typed configuration model
 ├── Models/
