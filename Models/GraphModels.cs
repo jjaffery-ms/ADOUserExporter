@@ -30,6 +30,24 @@ public sealed class GraphGroup
 
     [JsonPropertyName("descriptor")]
     public string? Descriptor { get; set; }
+
+    /// <summary>
+    /// The container domain of the group. For project-scoped groups this looks
+    /// like <c>vstfs:///Classification/TeamProject/{projectId}</c>; organization
+    /// (collection) level groups use a different domain.
+    /// </summary>
+    [JsonPropertyName("domain")]
+    public string? Domain { get; set; }
+}
+
+/// <summary>A team project in the organization (from the Core REST API).</summary>
+public sealed class AzureDevOpsProject
+{
+    [JsonPropertyName("id")]
+    public string? Id { get; set; }
+
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
 }
 
 public sealed class GraphMembership

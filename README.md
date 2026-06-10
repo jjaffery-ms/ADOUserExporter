@@ -6,16 +6,21 @@ It uses the [Azure DevOps Graph REST API](https://learn.microsoft.com/rest/api/a
 
 - Enumerate all **groups** in the organization (with pagination).
 - Enumerate all **users** in the organization (with pagination).
-- Resolve each user's **group memberships**.
-- Write the results to a CSV file with the columns `DisplayName`, `Email`, `PrincipalName`, and `Groups`.
+- Enumerate all **projects** in the organization (with pagination).
+- Resolve each user's **group memberships**, splitting them into organization-level groups and the groups the user belongs to within each project.
+- Write the results to a CSV file with the columns `DisplayName`, `Email`, `PrincipalName`, `OrganizationGroups`, `Projects`, and `ProjectGroups`.
 
 ## Output
 
 The generated CSV looks like this:
 
-| DisplayName | Email | PrincipalName | Groups |
-| ----------- | ----- | ------------- | ------ |
-| Jane Doe | jane@contoso.com | jane@contoso.com | Project Administrators; Contributors |
+| DisplayName | Email | PrincipalName | OrganizationGroups | Projects | ProjectGroups |
+| ----------- | ----- | ------------- | ------------------ | -------- | ------------- |
+| Jane Doe | jane@contoso.com | jane@contoso.com | Project Collection Valid Users | Web; Mobile | Web: Contributors, Readers; Mobile: Build Administrators |
+
+- `OrganizationGroups` — organization (collection) level groups the user is a direct member of.
+- `Projects` — the distinct projects the user is associated with (derived from project-scoped group membership).
+- `ProjectGroups` — for each project, the groups the user belongs to within that project, formatted as `ProjectName: Group1, Group2`.
 
 Values containing commas, quotes, or newlines are automatically quoted and escaped, and the file is written as UTF-8 (with BOM).
 
@@ -23,7 +28,7 @@ Values containing commas, quotes, or newlines are automatically quoted and escap
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
 - An Azure DevOps organization you have access to
-- A **Personal Access Token (PAT)** scoped to **Graph (Read)**. This scope is required for the tool to enumerate users, groups, and memberships via the Graph REST API.
+- A **Personal Access Token (PAT)** scoped to **Graph (Read)** and **Project and Team (Read)**. The Graph scope is required to enumerate users, groups, and memberships; the Project and Team scope is required to enumerate projects and map project-scoped groups to project names.
 
 ## Getting Started
 
@@ -54,7 +59,7 @@ Edit [appsettings.json](appsettings.json) and set your Azure DevOps organization
 
 ### 3. Provide your Personal Access Token
 
-The PAT must be scoped to **Graph (Read)** so the tool can read users, groups, and memberships. When creating the token in Azure DevOps, select the **Graph (Read)** scope (you may need to choose "Show all scopes" to see it).
+The PAT must be scoped to **Graph (Read)** and **Project and Team (Read)** so the tool can read users, groups, memberships, and projects. When creating the token in Azure DevOps, select those scopes (you may need to choose "Show all scopes" to see them).
 
 The PAT is a secret, so it is read from an environment variable rather than the config file (to keep it out of source control). Set the `ADO_PAT_FOR_READING_USERS` environment variable before running.
 
@@ -88,6 +93,8 @@ You'll see progress as the tool fetches groups, fetches users, and resolves memb
 Connecting to organization 'your-organization'...
 Fetching groups...
   Found 42 groups.
+Fetching projects...
+  Found 8 projects.
 Fetching users...
   Found 137 users.
 Resolving group memberships...
@@ -121,9 +128,9 @@ ADOUserExporter/
 ## How It Works
 
 1. Configuration is loaded from `appsettings.json` and bound to `AppSettings`.
-2. The PAT is read from the `ADO_PAT_FOR_READING_USERS` environment variable and used for Basic authentication against `https://vssps.dev.azure.com/`.
-3. All groups and users are retrieved, following the `X-MS-ContinuationToken` header for pagination.
-4. For each user with an email address, the tool requests the groups the user is a direct member of (`direction=up`) and maps the returned descriptors back to friendly group names.
+2. The PAT is read from the `ADO_PAT_FOR_READING_USERS` environment variable and used for Basic authentication against `https://vssps.dev.azure.com/` (Graph API) and `https://dev.azure.com/` (Core/projects API).
+3. All groups, projects, and users are retrieved, following the `X-MS-ContinuationToken` header for pagination.
+4. For each user with an email address, the tool requests the groups the user is a direct member of (`direction=up`) and maps the returned descriptors back to friendly group names. Each group's container domain is used to determine whether it is an organization-level group or a project-scoped group (`vstfs:///Classification/TeamProject/{projectId}`), and project ids are mapped to project names.
 5. The combined rows are written to the configured CSV file.
 
 ## Security Notes

@@ -46,6 +46,16 @@ public sealed class AzureDevOpsClient : IDisposable
         GetPagedAsync<GraphGroup>("graph/groups", cancellationToken);
 
     /// <summary>
+    /// Returns all team projects in the organization, following pagination. This
+    /// uses the Core REST API (on <c>dev.azure.com</c>) rather than the Graph API.
+    /// </summary>
+    public Task<List<AzureDevOpsProject>> GetProjectsAsync(CancellationToken cancellationToken = default) =>
+        GetPagedFromUriAsync<AzureDevOpsProject>(
+            $"https://dev.azure.com/{_organization}/_apis/projects",
+            "7.1",
+            cancellationToken);
+
+    /// <summary>
     /// Returns the group descriptors that the given subject (user) is a direct
     /// member of (direction=up).
     /// </summary>
@@ -70,8 +80,17 @@ public sealed class AzureDevOpsClient : IDisposable
             .ToList() ?? new List<string>();
     }
 
-    private async Task<List<T>> GetPagedAsync<T>(
+    private Task<List<T>> GetPagedAsync<T>(
         string resource,
+        CancellationToken cancellationToken) =>
+        GetPagedFromUriAsync<T>(
+            $"{_organization}/_apis/{resource}",
+            ApiVersion,
+            cancellationToken);
+
+    private async Task<List<T>> GetPagedFromUriAsync<T>(
+        string requestUriBase,
+        string apiVersion,
         CancellationToken cancellationToken)
     {
         var results = new List<T>();
@@ -79,8 +98,7 @@ public sealed class AzureDevOpsClient : IDisposable
 
         do
         {
-            var requestUri =
-                $"{_organization}/_apis/{resource}?api-version={ApiVersion}";
+            var requestUri = $"{requestUriBase}?api-version={apiVersion}";
             if (!string.IsNullOrEmpty(continuationToken))
             {
                 requestUri += $"&continuationToken={Uri.EscapeDataString(continuationToken)}";

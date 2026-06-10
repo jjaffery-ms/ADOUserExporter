@@ -36,6 +36,13 @@ try
         .ToDictionary(g => g.Descriptor!, g => g);
     Console.WriteLine($"  Found {groups.Count} groups.");
 
+    Console.WriteLine("Fetching projects...");
+    var projects = await client.GetProjectsAsync();
+    var projectNamesById = projects
+        .Where(p => !string.IsNullOrEmpty(p.Id))
+        .ToDictionary(p => p.Id!, p => p.Name ?? p.Id!, StringComparer.OrdinalIgnoreCase);
+    Console.WriteLine($"  Found {projects.Count} projects.");
+
     Console.WriteLine("Fetching users...");
     var users = await client.GetUsersAsync();
     Console.WriteLine($"  Found {users.Count} users.");
@@ -59,19 +66,59 @@ try
 
         var containerDescriptors = await client.GetMembershipContainersAsync(user.Descriptor);
 
-        var groupNames = containerDescriptors
-            .Select(descriptor =>
-                groupsByDescriptor.TryGetValue(descriptor, out var group)
-                    ? group.DisplayName ?? group.PrincipalName ?? descriptor
-                    : descriptor)
+        var orgGroups = new List<string>();
+        var groupsByProject = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var descriptor in containerDescriptors)
+        {
+            if (!groupsByDescriptor.TryGetValue(descriptor, out var group))
+            {
+                // Unknown container: keep the raw descriptor as an org-level entry.
+                orgGroups.Add(descriptor);
+                continue;
+            }
+
+            var groupName = group.DisplayName ?? group.PrincipalName ?? descriptor;
+            var projectId = GetProjectId(group.Domain);
+
+            if (projectId is not null && projectNamesById.TryGetValue(projectId, out var projectName))
+            {
+                if (!groupsByProject.TryGetValue(projectName, out var projectGroupList))
+                {
+                    projectGroupList = new List<string>();
+                    groupsByProject[projectName] = projectGroupList;
+                }
+                projectGroupList.Add(groupName);
+            }
+            else
+            {
+                orgGroups.Add(groupName);
+            }
+        }
+
+        var organizationGroups = orgGroups
             .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+        var projectNames = groupsByProject.Keys
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var projectGroups = projectNames
+            .Select(projectName =>
+            {
+                var groupList = groupsByProject[projectName]
+                    .OrderBy(name => name, StringComparer.OrdinalIgnoreCase);
+                return $"{projectName}: {string.Join(", ", groupList)}";
+            });
 
         rows.Add(new UserGroupRow(
             user.DisplayName ?? string.Empty,
             user.MailAddress ?? string.Empty,
             user.PrincipalName ?? string.Empty,
-            string.Join("; ", groupNames)));
+            string.Join("; ", organizationGroups),
+            string.Join("; ", projectNames),
+            string.Join("; ", projectGroups)));
 
         if (processed % 25 == 0)
         {
@@ -112,17 +159,39 @@ static bool ValidateSettings(AzureDevOpsSettings ado)
     return true;
 }
 
+// Extracts the project id from a group's container domain. Project-scoped groups
+// use a domain of the form "vstfs:///Classification/TeamProject/{projectId}".
+static string? GetProjectId(string? domain)
+{
+    const string marker = "Classification/TeamProject/";
+    if (string.IsNullOrEmpty(domain))
+    {
+        return null;
+    }
+
+    var index = domain.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+    if (index < 0)
+    {
+        return null;
+    }
+
+    var projectId = domain[(index + marker.Length)..].Trim();
+    return projectId.Length == 0 ? null : projectId;
+}
+
 static void WriteCsv(string filePath, IReadOnlyList<UserGroupRow> rows)
 {
     var sb = new StringBuilder();
-    sb.AppendLine("DisplayName,Email,PrincipalName,Groups");
+    sb.AppendLine("DisplayName,Email,PrincipalName,OrganizationGroups,Projects,ProjectGroups");
 
     foreach (var row in rows)
     {
         sb.Append(Escape(row.DisplayName)).Append(',')
           .Append(Escape(row.Email)).Append(',')
           .Append(Escape(row.PrincipalName)).Append(',')
-          .Append(Escape(row.Groups))
+          .Append(Escape(row.OrganizationGroups)).Append(',')
+          .Append(Escape(row.Projects)).Append(',')
+          .Append(Escape(row.ProjectGroups))
           .Append('\n');
     }
 
@@ -143,4 +212,6 @@ internal readonly record struct UserGroupRow(
     string DisplayName,
     string Email,
     string PrincipalName,
-    string Groups);
+    string OrganizationGroups,
+    string Projects,
+    string ProjectGroups);
