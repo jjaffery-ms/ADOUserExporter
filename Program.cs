@@ -4,12 +4,19 @@ using ADOUserExporter.Models;
 using ADOUserExporter.Services;
 using Microsoft.Extensions.Configuration;
 
+const string PatEnvironmentVariable = "ADO_PAT_FOR_READING_USERS";
+
 var configuration = new ConfigurationBuilder()
     .SetBasePath(AppContext.BaseDirectory)
     .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
     .Build();
 
 var settings = configuration.Get<AppSettings>() ?? new AppSettings();
+
+// The PAT is a secret and is read from an environment variable rather than the
+// config file so it is never committed to source control.
+settings.AzureDevOps.PersonalAccessToken =
+    Environment.GetEnvironmentVariable(PatEnvironmentVariable) ?? string.Empty;
 
 if (!ValidateSettings(settings.AzureDevOps))
 {
@@ -88,17 +95,17 @@ static bool ValidateSettings(AzureDevOpsSettings ado)
     var missing = new List<string>();
     if (string.IsNullOrWhiteSpace(ado.Organization) || ado.Organization == "your-organization")
     {
-        missing.Add("AzureDevOps:Organization");
+        missing.Add("AzureDevOps:Organization in appsettings.json");
     }
-    if (string.IsNullOrWhiteSpace(ado.PersonalAccessToken) || ado.PersonalAccessToken == "your-pat-token")
+    if (string.IsNullOrWhiteSpace(ado.PersonalAccessToken))
     {
-        missing.Add("AzureDevOps:PersonalAccessToken");
+        missing.Add("environment variable 'ADO_PAT_FOR_READING_USERS'");
     }
 
     if (missing.Count > 0)
     {
         Console.Error.WriteLine(
-            "Missing required configuration in appsettings.json: " + string.Join(", ", missing));
+            "Missing required configuration: " + string.Join(", ", missing));
         return false;
     }
 
