@@ -23,7 +23,7 @@ Values containing commas, quotes, or newlines are automatically quoted and escap
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
 - An Azure DevOps organization you have access to
-- A **Personal Access Token (PAT)** with permission to read users and groups (the **Member Entitlement Management** / **Graph (Read)** scopes)
+- A **Personal Access Token (PAT)** scoped to **Graph (Read)**. This scope is required for the tool to enumerate users, groups, and memberships via the Graph REST API.
 
 ## Getting Started
 
@@ -55,6 +55,8 @@ Edit [appsettings.json](appsettings.json) and set your Azure DevOps organization
 - `Output:FilePath` — the path of the CSV file to write. Relative paths are resolved against the working directory.
 
 ### 3. Provide your Personal Access Token
+
+The PAT must be scoped to **Graph (Read)** so the tool can read users, groups, and memberships. When creating the token in Azure DevOps, select the **Graph (Read)** scope (you may need to choose "Show all scopes" to see it).
 
 The PAT is a secret, so it is read from an environment variable rather than the config file (to keep it out of source control). Set the `ADO_PAT_FOR_READING_USERS` environment variable before running.
 
