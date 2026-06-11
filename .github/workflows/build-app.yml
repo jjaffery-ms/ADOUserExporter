@@ -5,7 +5,7 @@ name: .NET
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "ADOServer2022" ]
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
