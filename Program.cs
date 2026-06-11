@@ -27,7 +27,10 @@ try
 {
     using var client = new AzureDevOpsClient(settings.AzureDevOps);
 
-    Console.WriteLine($"Connecting to organization '{settings.AzureDevOps.Organization}'...");
+    var target = settings.AzureDevOps.UseServer
+        ? settings.AzureDevOps.CollectionUrl
+        : settings.AzureDevOps.Organization;
+    Console.WriteLine($"Connecting to '{target}'...");
 
     Console.WriteLine("Fetching groups...");
     var groups = await client.GetGroupsAsync();
@@ -140,9 +143,16 @@ catch (HttpRequestException ex)
 static bool ValidateSettings(AzureDevOpsSettings ado)
 {
     var missing = new List<string>();
-    if (string.IsNullOrWhiteSpace(ado.Organization) || ado.Organization == "your-organization")
+
+    var hasOrganization = !string.IsNullOrWhiteSpace(ado.Organization)
+        && ado.Organization != "your-organization";
+    var hasCollection = !string.IsNullOrWhiteSpace(ado.CollectionUrl);
+
+    if (!hasOrganization && !hasCollection)
     {
-        missing.Add("AzureDevOps:Organization in appsettings.json");
+        missing.Add(
+            "either AzureDevOps:Organization (cloud) or AzureDevOps:CollectionUrl " +
+            "(on-premises Azure DevOps Server) in appsettings.json");
     }
     if (string.IsNullOrWhiteSpace(ado.PersonalAccessToken))
     {
